@@ -32,9 +32,9 @@ This document provides installation instructions for TypeCAD and two complementa
 ## Prerequisites
 
 **Required Software:**
-- KiCAD 9.0 or higher (confirmed: 9.0.7 installed)
-- Node.js 18 or higher (confirmed: v22.21.0 installed)
-- Python 3.11 or higher
+- KiCAD 9.0 or higher (confirmed: 9.0.7 with bundled Python 3.9)
+- Node.js 18 or higher (confirmed: v22.14.0)
+- Python 3.11+ system installation (confirmed: 3.11.14)
 - Claude Desktop application
 - uv (Python package installer) for lamaalrajih server
 - Git
@@ -54,7 +54,7 @@ This document provides installation instructions for TypeCAD and two complementa
 node --version
 ```
 
-Expected output: `v22.21.0` or higher
+Expected: `v22.14.0` or higher
 
 ### Verify Python Installation
 
@@ -62,25 +62,27 @@ Expected output: `v22.21.0` or higher
 python3 --version
 ```
 
-Expected output: `Python 3.11.x` or higher
+Expected: `Python 3.11.14` or higher
 
 ### Verify KiCAD Python Module
 
-```bash
-python3 -c "import pcbnew; print(pcbnew.GetBuildVersion())"
-```
-
-Expected output: KiCAD version string (e.g., `9.0.7`)
-
-### Verify KiCAD Installation Path
+**CRITICAL:** Use KiCAD's bundled Python 3.9, not system Python.
 
 ```bash
-ls /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/
+/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3 -c "import pcbnew; print(pcbnew.GetBuildVersion())"
 ```
 
-Note the Python version directory (typically `3.11` or `3.12`)
+Expected: `9.0.7`
 
-### Install uv (if not installed)
+### Verify KiCAD Python Path
+
+```bash
+ls /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/
+```
+
+Confirm `python3` executable exists.
+
+### Install uv
 
 ```bash
 brew install uv
@@ -104,22 +106,20 @@ pipx install uv
 npm install -g @typecad/typecad-mcp
 ```
 
-#### Verify TypeCAD Installation
+#### Verify Installation
 
 ```bash
 npx @typecad/typecad-mcp --help
 ```
 
-#### TypeCAD Claude Desktop Configuration
-
-Edit Claude Desktop configuration file:
+#### Claude Desktop Configuration
 
 ```bash
 mkdir -p ~/Library/Application\ Support/Claude
 vim ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-Add TypeCAD MCP server configuration:
+Add configuration:
 
 ```json
 {
@@ -137,8 +137,6 @@ Add TypeCAD MCP server configuration:
 
 ### mixelpixx KiCAD MCP Server
 
-This server enables full PCB design automation through natural language commands.
-
 #### Clone Repository
 
 ```bash
@@ -151,8 +149,10 @@ cd KiCAD-MCP-Server
 
 ```bash
 npm install
-pip3 install -r requirements.txt
+/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/pip3 install -r requirements.txt
 ```
+
+**Note:** Using KiCAD's pip to install Python dependencies in KiCAD's environment.
 
 #### Build Server
 
@@ -160,25 +160,31 @@ pip3 install -r requirements.txt
 npm run build
 ```
 
-#### Configure PYTHONPATH
+#### Configure KiCAD Library Tables
 
-Determine KiCAD Python path:
+**CRITICAL:** KiCAD MCP requires library tables to access footprint and symbol libraries.
+
+**Check if library tables exist:**
 
 ```bash
-ls /Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/
+ls ~/Library/Preferences/kicad/9.0/fp-lib-table
+ls ~/Library/Preferences/kicad/9.0/sym-lib-table
 ```
 
-Use the version directory (e.g., `3.11`) in the PYTHONPATH configuration below.
+**If files do not exist, copy templates:**
+
+```bash
+cp /Applications/KiCad/KiCad.app/Contents/SharedSupport/template/fp-lib-table ~/Library/Preferences/kicad/9.0/
+cp /Applications/KiCad/KiCad.app/Contents/SharedSupport/template/sym-lib-table ~/Library/Preferences/kicad/9.0/
+```
 
 #### Add to Claude Desktop Configuration
-
-Edit configuration file:
 
 ```bash
 vim ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-Add mixelpixx server (merge with existing TypeCAD configuration):
+Add server (merge with TypeCAD):
 
 ```json
 {
@@ -192,21 +198,25 @@ Add mixelpixx server (merge with existing TypeCAD configuration):
       "command": "node",
       "args": ["/Users/williamwatson/Documents/GitHub/KiCAD-MCP-Server/dist/index.js"],
       "env": {
-        "PYTHONPATH": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages",
-        "LOG_LEVEL": "info"
+        "PYTHON_PATH": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3",
+        "LOG_LEVEL": "info",
+        "KICAD_CONFIG_HOME": "/Users/williamwatson/Library/Preferences/kicad/9.0",
+        "KICAD9_FOOTPRINT_DIR": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+        "KICAD9_SYMBOL_DIR": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols"
       }
     }
   }
 }
 ```
 
-**Note:** Adjust PYTHONPATH Python version (`3.11` or `3.12`) based on system verification results.
+**CRITICAL:** 
+- MCP server uses `PYTHON_PATH` to specify KiCAD's Python interpreter
+- `KICAD_CONFIG_HOME` points to version-specific configuration directory
+- `KICAD9_FOOTPRINT_DIR` and `KICAD9_SYMBOL_DIR` resolve library table paths
 
 [Return to Table of Contents](<#table of contents>)
 
 ### lamaalrajih KiCAD MCP Server
-
-This server provides analysis, validation and design rule checking capabilities.
 
 #### Clone Repository
 
@@ -222,7 +232,7 @@ cd kicad-mcp
 make install
 ```
 
-This creates a virtual environment in `.venv/` directory.
+Creates virtual environment in `.venv/`.
 
 #### Configure Project Search Paths
 
@@ -231,22 +241,19 @@ cp .env.example .env
 vim .env
 ```
 
-Add KiCAD project directories:
+Add project directories:
 
 ```bash
-# Add paths to KiCAD projects (comma-separated)
 KICAD_SEARCH_PATHS=~/Documents/GitHub/KiCAD,~/Documents/PCB,~/Electronics
 ```
 
 #### Add to Claude Desktop Configuration
 
-Edit configuration file:
-
 ```bash
 vim ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-Add lamaalrajih server (merge with existing configuration):
+Add server (merge with existing):
 
 ```json
 {
@@ -260,8 +267,11 @@ Add lamaalrajih server (merge with existing configuration):
       "command": "node",
       "args": ["/Users/williamwatson/Documents/GitHub/KiCAD-MCP-Server/dist/index.js"],
       "env": {
-        "PYTHONPATH": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages",
-        "LOG_LEVEL": "info"
+        "PYTHON_PATH": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3",
+        "LOG_LEVEL": "info",
+        "KICAD_CONFIG_HOME": "/Users/williamwatson/Library/Preferences/kicad/9.0",
+        "KICAD9_FOOTPRINT_DIR": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+        "KICAD9_SYMBOL_DIR": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols"
       }
     },
     "kicad-analysis": {
@@ -276,9 +286,9 @@ Add lamaalrajih server (merge with existing configuration):
 
 ## Claude Desktop Configuration
 
-### Complete Configuration Example
+### Complete Configuration
 
-Final `claude_desktop_config.json` with all three servers:
+Final `claude_desktop_config.json`:
 
 ```json
 {
@@ -292,7 +302,7 @@ Final `claude_desktop_config.json` with all three servers:
       "command": "node",
       "args": ["/Users/williamwatson/Documents/GitHub/KiCAD-MCP-Server/dist/index.js"],
       "env": {
-        "PYTHONPATH": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages",
+        "PYTHON_PATH": "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3",
         "LOG_LEVEL": "info"
       }
     },
@@ -306,48 +316,33 @@ Final `claude_desktop_config.json` with all three servers:
 
 ### Restart Claude Desktop
 
-Close and reopen Claude Desktop to load MCP server configurations.
+Quit and reopen Claude Desktop.
 
 [Return to Table of Contents](<#table of contents>)
 
 ## Verification
 
-### Verify TypeCAD MCP Server
-
-In Claude Desktop, ask:
+### Verify TypeCAD
 
 ```
 Create a new typeCAD project called 'test-circuit'
 ```
 
-Expected: Project creation confirmation
-
-### Verify mixelpixx KiCAD MCP Server
-
-In Claude Desktop, ask:
+### Verify mixelpixx KiCAD MCP
 
 ```
 Create a new KiCAD project named 'TestProject' in my Documents folder
 ```
 
-Expected: Project creation confirmation and file paths
-
-### Verify lamaalrajih KiCAD MCP Server
-
-In Claude Desktop, ask:
+### Verify lamaalrajih KiCAD MCP
 
 ```
 List my KiCAD projects
 ```
 
-Expected: List of projects found in configured search paths
+### Check MCP Status
 
-### Check MCP Server Status
-
-In Claude Desktop:
-1. Click the MCP icon (if visible in interface)
-2. Verify three servers appear: `typecad-mcp`, `kicad-design`, `kicad-analysis`
-3. Confirm status shows "connected" or "active"
+In Claude Desktop, verify three servers show as connected: `typecad-mcp`, `kicad-design`, `kicad-analysis`.
 
 [Return to Table of Contents](<#table of contents>)
 
@@ -396,48 +391,82 @@ Analyze the PCB design statistics
 
 ## Troubleshooting
 
-### MCP Servers Not Appearing in Claude Desktop
+### MCP Servers Not Appearing
 
-**Solution 1:** Verify configuration file location and syntax
+**Verify configuration syntax:**
 
 ```bash
 cat ~/Library/Application\ Support/Claude/claude_desktop_config.json
 ```
 
-Ensure valid JSON syntax with no trailing commas.
-
-**Solution 2:** Check absolute paths are correct
+**Check paths:**
 
 ```bash
 ls -l /Users/williamwatson/Documents/GitHub/KiCAD-MCP-Server/dist/index.js
 ls -l /Users/williamwatson/Documents/GitHub/kicad-mcp/.venv/bin/python
 ```
 
-**Solution 3:** Restart Claude Desktop completely (Quit and reopen)
+**Restart Claude Desktop** completely.
 
 ### Python Module Import Errors
 
 **Error:** `ModuleNotFoundError: No module named 'pcbnew'`
 
-**Solution:** Verify PYTHONPATH matches KiCAD installation:
+**Solution:** Verify KiCAD Python interpreter:
 
 ```bash
-python3 -c "import sys; print('\n'.join(sys.path))"
+/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3 -c "import pcbnew; print(pcbnew.GetBuildVersion())"
 ```
 
-Ensure path includes KiCAD's Python site-packages directory.
+Should output: `9.0.7`
 
-**Alternative:** Set PYTHONPATH explicitly in shell profile:
+**Error:** `ImportError: Library not loaded: libwx_osx_cocoau_gl-3.2.0.dylib`
+
+**Cause:** Using system Python instead of KiCAD's bundled Python.
+
+**Solution:** MCP servers must use KiCAD's Python via `PYTHON_PATH` environment variable or direct interpreter path.
+
+### Library Loading Errors
+
+**Symptom:** Server logs show:
+```
+[WARNING] Global fp-lib-table not found
+[INFO] Loaded 0 footprint libraries
+[INFO] Loaded 0 symbol libraries
+```
+
+**Cause:** Missing library table files in user configuration directory.
+
+**Solution:** Copy template library tables:
 
 ```bash
-export PYTHONPATH="/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages:$PYTHONPATH"
+cp /Applications/KiCad/KiCad.app/Contents/SharedSupport/template/fp-lib-table ~/Library/Preferences/kicad/9.0/
+cp /Applications/KiCad/KiCad.app/Contents/SharedSupport/template/sym-lib-table ~/Library/Preferences/kicad/9.0/
+```
+
+**Verify environment variables in MCP config:**
+
+```json
+"env": {
+  "KICAD_CONFIG_HOME": "/Users/williamwatson/Library/Preferences/kicad/9.0",
+  "KICAD9_FOOTPRINT_DIR": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/footprints",
+  "KICAD9_SYMBOL_DIR": "/Applications/KiCad/KiCad.app/Contents/SharedSupport/symbols"
+}
+```
+
+**Verify successful loading in logs:**
+
+```bash
+tail -50 ~/Library/Logs/Claude/mcp-server-kicad-design.log | grep "Loaded.*libraries"
+```
+
+Expected output:
+```
+[INFO] Loaded 155 footprint libraries
+[INFO] Loaded 223 symbol libraries
 ```
 
 ### mixelpixx Build Failures
-
-**Error:** `npm run build` fails
-
-**Solution 1:** Clear node modules and reinstall:
 
 ```bash
 cd ~/Documents/GitHub/KiCAD-MCP-Server
@@ -446,46 +475,22 @@ npm install
 npm run build
 ```
 
-**Solution 2:** Check Node.js version compatibility:
-
-```bash
-node --version
-```
-
-Ensure v18 or higher.
-
 ### lamaalrajih Installation Issues
 
-**Error:** uv installation fails
-
-**Solution:** Install uv via alternative method:
+Install uv via alternative:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Or use pip:
-
-```bash
-pip3 install uv
-```
-
 ### TypeCAD Command Not Found
-
-**Solution:** Reinstall globally with explicit path:
 
 ```bash
 npm install -g @typecad/typecad-mcp
-which npx
-```
-
-Verify npm global bin directory is in PATH:
-
-```bash
 npm config get prefix
 ```
 
-Add to PATH if needed:
+Add npm bin to PATH:
 
 ```bash
 export PATH="$(npm config get prefix)/bin:$PATH"
@@ -493,25 +498,18 @@ export PATH="$(npm config get prefix)/bin:$PATH"
 
 ### KiCAD Project Not Found
 
-**Error:** lamaalrajih server cannot find projects
-
-**Solution:** Verify `.env` configuration:
+Verify `.env`:
 
 ```bash
 cd ~/Documents/GitHub/kicad-mcp
 cat .env
 ```
 
-Ensure KICAD_SEARCH_PATHS contains valid directories with KiCAD projects.
+### IPC API Not Working
 
-### IPC API Not Working (mixelpixx)
-
-**Note:** IPC features are experimental in mixelpixx server.
-
-**Solution:** Enable IPC in KiCAD:
-
+Enable in KiCAD:
 1. Open KiCAD
-2. Navigate to Preferences → Plugins
+2. Preferences → Plugins
 3. Enable "IPC API Server"
 4. Restart KiCAD
 
@@ -537,7 +535,10 @@ Ensure KICAD_SEARCH_PATHS contains valid directories with KiCAD projects.
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.0 | 2026-01-18 | William Watson | Initial installation guide created for TypeCAD and KiCAD MCP servers on macOS M4 |
+| 1.0 | 2026-01-18 | William Watson | Initial installation guide |
+| 1.1 | 2026-01-18 | William Watson | Corrected Python paths for KiCAD 9.0.7 Python 3.9 |
+| 1.2 | 2026-01-18 | William Watson | Updated to use KiCAD bundled Python interpreter directly, resolved library loading issues |
+| 1.3 | 2026-01-18 | William Watson | Added library table configuration and environment variables for KICAD9 library resolution |
 
 [Return to Table of Contents](<#table of contents>)
 
