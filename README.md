@@ -29,7 +29,7 @@ KiCAD/
 
 ## Prerequisites
 
-- KiCAD 8.0 or later
+- KiCAD 9.0 or later
 
 [Return to Table of Contents](<#table of contents>)
 
