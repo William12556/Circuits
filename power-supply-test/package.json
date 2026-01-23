@@ -1,0 +1,15 @@
+{
+  "name": "power-supply-test",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@typecad/typecad": "latest",
+    "@typecad/passives": "latest"
+  },
+  "devDependencies": {
+    "tsx": "latest",
+    "typescript": "latest"
+  }
+}
